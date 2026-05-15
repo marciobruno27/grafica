@@ -500,7 +500,7 @@ const SADM = {full:'2511', print:'2511'};
 const SEQ  = {full:'2040', print:'3857'};
 let lojaAtual = 'full';
 let modoAtual = '';
-let pedidos = [], lancamentos = [], despesas = [], pedidosExternos = [];
+let pedidos = [], lancamentos = [], despesas = [];
 let per = 'dia';
 let fotoData = {e: null, d: null};
 let fotosArray = []; // múltiplas fotos do pedido
@@ -553,7 +553,7 @@ window.entrarEquipe = function() {
 window.sair = function() {
   modoAtual = ''; lojaAtual = 'full';
   unsubs.forEach(u=>u()); unsubs=[];
-  pedidos=[]; lancamentos=[]; despesas=[]; pedidosExternos=[];
+  pedidos=[]; lancamentos=[]; despesas=[]; 
   document.getElementById('senha-input').value='';
   document.getElementById('btn-full').className='loja-btn sel-full';
   document.getElementById('btn-print').className='loja-btn';
@@ -628,36 +628,6 @@ function configurarUI() {
     }
   }
 
-  if(lojaAtual === 'full') {
-    // Aba Da Print para ADM
-    if(modoAtual==='adm') {
-      const ta = document.createElement('button');
-      ta.className='tab tab-ext';
-      ta.innerHTML = '📥 Da Print <span id="ext-badge" style="background:#06b6d4;color:#fff;border-radius:20px;padding:1px 7px;font-size:9px;margin-left:4px">0</span>';
-      ta.onclick=function(){ mudarTab('adm','daprint',this); };
-      admTabs.appendChild(ta);
-      const pa = document.createElement('div');
-      pa.className='tab-panel tab-panel-ext'; pa.id='adm-tab-daprint';
-      pa.innerHTML=`<div class="caixa-card"><div class="caixa-hd"><span>📥 Pedidos recebidos da Print Up</span></div><div id="full-ext-lista-adm" class="ext-lista"></div></div>`;
-      document.getElementById('adm-tab-despesas').parentNode.appendChild(pa);
-    }
-    // Aba Da Print para EQUIPE
-    const eqTabs = document.getElementById('eq-tabs');
-    if(eqTabs) {
-      const te = document.createElement('button');
-      te.className='tab tab-ext';
-      te.innerHTML = '📥 Da Print <span id="ext-badge-eq" style="background:#06b6d4;color:#fff;border-radius:20px;padding:1px 7px;font-size:9px;margin-left:4px">0</span>';
-      te.onclick=function(){ mudarTab('eq','daprint',this); };
-      eqTabs.appendChild(te);
-      const pe = document.createElement('div');
-      pe.className='tab-panel'; pe.id='eq-tab-daprint';
-      pe.innerHTML=`<div class="caixa-card"><div class="caixa-hd"><span>📥 Pedidos recebidos da Print Up</span></div><div id="full-ext-lista" class="ext-lista"></div></div>`;
-      // Inserir após a aba de despesas da equipe
-      const despPanel = document.getElementById('eq-tab-despesas');
-      if(despPanel) despPanel.parentNode.insertBefore(pe, despPanel.nextSibling);
-    }
-  }
-}
 
 function iniciarListeners() {
   unsubs.forEach(u=>u()); unsubs=[];
@@ -678,12 +648,6 @@ function iniciarListeners() {
     renderDespEq();
     if(modoAtual==='adm') renderDespAdm();
   }));
-  // pedidos externos (shared)
-  const q4 = query(collection(db,'print_para_full'), orderBy('criado','desc'));
-  unsubs.push(onSnapshot(q4, snap=>{
-    pedidosExternos = snap.docs.map(d=>({fid:d.id,...d.data()}));
-    renderExternos();
-  }));
 }
 
 window.mudarTab = function(modo, tab, el) {
@@ -697,9 +661,6 @@ window.mudarTab = function(modo, tab, el) {
   if(modo==='adm' && tab==='prazo') renderPrazo();
   if(modo==='adm' && tab==='despesas') renderDespAdm();
   if(modo==='adm' && tab==='historico') renderHistorico();
-  if(tab==='daprint') renderExternos();
-  if(modo==='adm' && tab==='externo') renderExternos();
-  if(tab==='externo' && modo==='eq') renderExternos();
 };
 
 
@@ -852,7 +813,7 @@ function renderAlertas(id){
   const prontos=pedidos.filter(p=>p.status==='pronto');
   const sinalPronto=pedidos.filter(p=>p.pgtoTipo==='sinal'&&p.status==='pronto');
   const prazoVenc=pedidos.filter(p=>p.pgtoTipo==='prazo'&&p.prazoVenc&&p.prazoVenc!=='indeterminado'&&new Date(p.prazoVenc+'T00:00:00')<=hoje&&p.status!=='entregue');
-  const extProntos=pedidosExternos.filter(p=>p.status==='pronto'&&lojaAtual==='print');
+  const extProntos=[];
   const al=[];
   if(atrasados.length) al.push(`<div class="alerta alerta-er">⚠️ <span><strong>${atrasados.length} atrasado${atrasados.length>1?'s':''}:</strong> ${atrasados.map(p=>p.cli).join(', ')}</span></div>`);
   if(venceHj.length) al.push(`<div class="alerta alerta-wn">🕐 <span><strong>Entrega hoje:</strong> ${venceHj.map(p=>p.cli).join(', ')}</span></div>`);
@@ -876,9 +837,9 @@ function renderAdm(){
     <div class="rd"><div class="rd-lbl">Em aberto</div><div class="rd-val az">${ativos}</div></div>
     <div class="rd"><div class="rd-lbl">Prontos/retirar</div><div class="rd-val vd">${prontos}</div></div>
     <div class="rd"><div class="rd-lbl">A receber</div><div class="rd-val am">${aprazo}</div></div>
-    <div class="rd"><div class="rd-lbl">Externos (Print)</div><div class="rd-val cy">${pedidosExternos.filter(p=>p.status!=='entregue').length}</div></div>`;
+    <div class="rd"><div class="rd-lbl">Externos (Print)</div><div class="rd-val cy">0</div></div>`;
   const pb=document.getElementById('prazo-badge'); if(pb) pb.textContent=aprazo;
-  const eb=document.getElementById('ext-badge'); if(eb) eb.textContent=pedidosExternos.filter(p=>p.status==='aguardando').length;
+  const eb=document.getElementById('ext-badge'); if(eb) eb.textContent=0;
 }
 
 window.abrirModal = function(modo,fid){
@@ -1015,102 +976,12 @@ window.registrar=async function(){
 };
 
 // ENVIAR PARA FULL
-window.enviarParaFull=async function(){
-  const cli=document.getElementById('x-cli').value.trim();
-  const srv=document.getElementById('x-srv').value;
-  if(!cli){toast('Informe o cliente.','er');return;}
-  if(!srv){toast('Selecione o serviço.','er');return;}
-  const val=parseFloat(document.getElementById('x-val').value)||0;
-  const urg=document.getElementById('x-urg').value==='1';
-  await addDoc(collection(db,'print_para_full'),{
-    cli,srv,obs:document.getElementById('x-obs').value.trim(),
-    prz:document.getElementById('x-prz').value,val,urg,
-    imgs:fotosArray.length>0&&document.getElementById('x-fotos-lista')?Array.from(document.getElementById('x-fotos-lista').querySelectorAll('img')).map(i=>i.src):[],img:fotoData['x']||null,status:'aguardando',
-    criado:serverTimestamp(),origem:'Print Up'
-  });
-  if(val>0) await addDoc(collection(db,'print_lancamentos'),{tipo:'saida',desc:`Full Gráfica – ${cli} (${srv})`,val,pgto:'Interno',cat:'Produção Full',data:hj(),criado:serverTimestamp()});
-  ['x-cli','x-obs','x-val'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('x-srv').value='';
-  document.getElementById('x-prz').value=hj();
-  remFoto('x');
-  toast('✓ Pedido enviado para Full Gráfica!','info');
-};
+
 
 // FULL: atualizar status do pedido externo
-window.avancarExterno=async function(fid){
-  const p=pedidosExternos.find(x=>x.fid===fid); if(!p) return;
-  const s=['aguardando','producao','pronto'];
-  const i=s.indexOf(p.status);
-  if(i<s.length-1){
-    await updateDoc(doc(db,'print_para_full',fid),{status:s[i+1]});
-    toast('Status atualizado!');
-  }
-};
 
-function renderExternos(){
-  // Print: ver o que enviou
-  if(lojaAtual==='print'){
-    const el=document.getElementById('print-ext-lista'); if(!el) return;
-    const minha=pedidosExternos;
-    if(!minha.length){el.innerHTML='<div class="vazio">Nenhum pedido enviado ainda</div>';return;}
-    const smap={aguardando:'ext-s-ag',producao:'ext-s-pr',pronto:'ext-s-pt'};
-    const slbl={aguardando:'Aguardando',producao:'Em produção',pronto:'✅ Pronto — buscar!'};
-    el.innerHTML=`<div class="caixa-card"><div class="caixa-hd"><span>Pedidos na Full</span></div><div class="ext-lista">`+
-      minha.map(p=>`<div class="ext-item">
-        <div class="ext-item-hd">
-          <div><div class="ext-item-nome">${p.cli}</div><div class="ext-item-srv">${p.srv}</div><div class="ext-item-meta">Prazo: ${fdt(p.prz)} · ${fmt(p.val)}</div></div>
-          <span class="ext-status ${smap[p.status]||'ext-s-pr'}">${slbl[p.status]||p.status}</span>
-        </div>
-        ${p.obs?`<div style="font-size:10px;color:#6b7280;margin-top:4px">${p.obs}</div>`:''}
-        ${p.img?`<img src="${p.img}" class="ext-img" alt="Arte">`:''}
-      </div>`).join('')+`</div></div>`;
-    if(modoAtual==='adm'){
-      const adml=document.getElementById('adm-ext-lista'); if(!adml) return;
-      adml.innerHTML=minha.map(p=>`<div class="ext-item">
-        <div class="ext-item-hd">
-          <div><div class="ext-item-nome">${p.cli}</div><div class="ext-item-srv">${p.srv}</div><div class="ext-item-meta">Prazo: ${fdt(p.prz)} · ${fmt(p.val)}</div></div>
-          <span class="ext-status ${smap[p.status]||'ext-s-pr'}">${slbl[p.status]||p.status}</span>
-        </div>
-        ${p.img?`<img src="${p.img}" class="ext-img" alt="Arte">`:''}
-      </div>`).join('');
-    }
-  }
-  // Full: ver o que recebeu da Print
-  if(lojaAtual==='full'){
-    // Renderiza em ambos os containers (adm e equipe)
-    const containers = ['full-ext-lista', 'full-ext-lista-adm'].map(id => document.getElementById(id)).filter(Boolean);
-    if(!containers.length) return;
-    const el = containers[0];
-    const smap={aguardando:'ext-s-ag',producao:'ext-s-pr',pronto:'ext-s-pt'};
-    const slbl={aguardando:'Aguardando',producao:'Em produção',pronto:'Pronto'};
-    if(!pedidosExternos.length){el.innerHTML='<div class="vazio">Nenhum pedido da Print ainda</div>';return;}
-    el.innerHTML=pedidosExternos.map(p=>`<div class="ext-item">
-      <div class="ext-item-hd">
-        <div><div class="ext-item-nome">${p.cli} <span class="ext-badge">Print</span></div><div class="ext-item-srv">${p.srv}</div><div class="ext-item-meta">Prazo: ${fdt(p.prz)}${p.urg?' · ⚡ URGENTE':''} · ${fmt(p.val)}</div></div>
-        <span class="ext-status ${smap[p.status]||'ext-s-ag'}">${slbl[p.status]||p.status}</span>
-      </div>
-      ${p.obs?`<div style="font-size:10px;color:#6b7280;margin-top:4px">${p.obs}</div>`:''}
-      ${p.img?`<img src="${p.img}" class="ext-img" alt="Arte">`:''}
-      ${p.status!=='pronto'?`<button class="m-btn verde" style="margin-top:8px;width:auto;padding:6px 14px;font-size:11px" onclick="avancarExterno('${p.fid}')">${p.status==='aguardando'?'▶ Iniciar produção':'✓ Marcar como pronto'}</button>`:`<div style="font-size:11px;color:#34d399;margin-top:6px;font-weight:600">✅ Concluído — aguardando Print buscar</div>`}
-    </div>`).join('');
-    const eb=document.getElementById('ext-badge');
-    if(eb) eb.textContent=pedidosExternos.filter(p=>p.status==='aguardando').length;
-  }
-}
 
-window.salvarDesp=async function(){
-  const desc=document.getElementById('d-desc').value.trim();
-  const val=parseFloat(document.getElementById('d-val').value)||0;
-  if(!desc){toast('Informe a descrição.','er');return;}
-  if(!val){toast('Informe o valor.','er');return;}
-  const quem=document.getElementById('d-quem').value.trim()||'Equipe';
-  const col=LOJAS[lojaAtual].col;
-  await addDoc(collection(db,`${col}_despesas`),{desc,val,origem:document.getElementById('d-origem').value,cat:document.getElementById('d-cat').value,quem,data:hj(),img:fotoData['d']||null,criado:serverTimestamp()});
-  await addDoc(collection(db,`${col}_lancamentos`),{tipo:'saida',desc:`${desc} (${quem})`,val,pgto:'Caixa',cat:'Despesa equipe',data:hj(),criado:serverTimestamp()});
-  ['d-desc','d-val','d-quem'].forEach(id=>document.getElementById(id).value='');
-  remFoto('d');
-  toast('✓ Despesa registrada!');
-};
+
 
 function renderDespEq(){
   const el=document.getElementById('desp-lista-eq'); if(!el) return;
