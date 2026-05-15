@@ -628,16 +628,34 @@ function configurarUI() {
     }
   }
 
-  if(lojaAtual === 'full' && modoAtual==='adm') {
-    const ta = document.createElement('button');
-    ta.className='tab tab-ext'; ta.textContent='📥 Da Print Up<span id="ext-badge" style="background:#06b6d4;color:#fff;border-radius:20px;padding:1px 7px;font-size:9px;margin-left:4px">0</span>';
-    ta.innerHTML = '📥 Da Print Up <span id="ext-badge" style="background:#06b6d4;color:#fff;border-radius:20px;padding:1px 7px;font-size:9px;margin-left:4px">0</span>';
-    ta.onclick=function(){ mudarTab('adm','daprint',this); };
-    admTabs.appendChild(ta);
-    const pa = document.createElement('div');
-    pa.className='tab-panel tab-panel-ext'; pa.id='adm-tab-daprint';
-    pa.innerHTML=`<div class="caixa-card"><div class="caixa-hd"><span>📥 Pedidos recebidos da Print Up</span></div><div id="full-ext-lista" class="ext-lista"></div></div>`;
-    document.getElementById('adm-tab-despesas').parentNode.appendChild(pa);
+  if(lojaAtual === 'full') {
+    // Aba Da Print para ADM
+    if(modoAtual==='adm') {
+      const ta = document.createElement('button');
+      ta.className='tab tab-ext';
+      ta.innerHTML = '📥 Da Print <span id="ext-badge" style="background:#06b6d4;color:#fff;border-radius:20px;padding:1px 7px;font-size:9px;margin-left:4px">0</span>';
+      ta.onclick=function(){ mudarTab('adm','daprint',this); };
+      admTabs.appendChild(ta);
+      const pa = document.createElement('div');
+      pa.className='tab-panel tab-panel-ext'; pa.id='adm-tab-daprint';
+      pa.innerHTML=`<div class="caixa-card"><div class="caixa-hd"><span>📥 Pedidos recebidos da Print Up</span></div><div id="full-ext-lista-adm" class="ext-lista"></div></div>`;
+      document.getElementById('adm-tab-despesas').parentNode.appendChild(pa);
+    }
+    // Aba Da Print para EQUIPE
+    const eqTabs = document.getElementById('eq-tabs');
+    if(eqTabs) {
+      const te = document.createElement('button');
+      te.className='tab tab-ext';
+      te.innerHTML = '📥 Da Print <span id="ext-badge-eq" style="background:#06b6d4;color:#fff;border-radius:20px;padding:1px 7px;font-size:9px;margin-left:4px">0</span>';
+      te.onclick=function(){ mudarTab('eq','daprint',this); };
+      eqTabs.appendChild(te);
+      const pe = document.createElement('div');
+      pe.className='tab-panel'; pe.id='eq-tab-daprint';
+      pe.innerHTML=`<div class="caixa-card"><div class="caixa-hd"><span>📥 Pedidos recebidos da Print Up</span></div><div id="full-ext-lista" class="ext-lista"></div></div>`;
+      // Inserir após a aba de despesas da equipe
+      const despPanel = document.getElementById('eq-tab-despesas');
+      if(despPanel) despPanel.parentNode.insertBefore(pe, despPanel.nextSibling);
+    }
   }
 }
 
@@ -679,7 +697,7 @@ window.mudarTab = function(modo, tab, el) {
   if(modo==='adm' && tab==='prazo') renderPrazo();
   if(modo==='adm' && tab==='despesas') renderDespAdm();
   if(modo==='adm' && tab==='historico') renderHistorico();
-  if(modo==='adm' && tab==='daprint') renderExternos();
+  if(tab==='daprint') renderExternos();
   if(modo==='adm' && tab==='externo') renderExternos();
   if(tab==='externo' && modo==='eq') renderExternos();
 };
@@ -1058,8 +1076,11 @@ function renderExternos(){
     }
   }
   // Full: ver o que recebeu da Print
-  if(lojaAtual==='full'&&modoAtual==='adm'){
-    const el=document.getElementById('full-ext-lista'); if(!el) return;
+  if(lojaAtual==='full'){
+    // Renderiza em ambos os containers (adm e equipe)
+    const containers = ['full-ext-lista', 'full-ext-lista-adm'].map(id => document.getElementById(id)).filter(Boolean);
+    if(!containers.length) return;
+    const el = containers[0];
     const smap={aguardando:'ext-s-ag',producao:'ext-s-pr',pronto:'ext-s-pt'};
     const slbl={aguardando:'Aguardando',producao:'Em produção',pronto:'Pronto'};
     if(!pedidosExternos.length){el.innerHTML='<div class="vazio">Nenhum pedido da Print ainda</div>';return;}
