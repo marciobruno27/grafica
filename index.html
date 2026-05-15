@@ -353,13 +353,13 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f1117;color:#f3f4f
         </div>
         <!-- FOTO DO MATERIAL -->
         <div class="foto-area">
-          <span class="foto-area-lbl">📸 Arte / Fotos do material (pode adicionar várias)</span>
-          <div class="img-drop" id="e-img-drop" onclick="document.getElementById('e-img-input').click()" ondragover="event.preventDefault()" ondrop="dropFotoMulti(event)">
-            <span class="img-drop-ico">🖼️</span>Clique ou arraste as artes aqui · JPG, PNG, WEBP
+          <span class="foto-area-lbl">📸 Arte / Foto do material a imprimir (opcional)</span>
+          <div class="img-drop" id="e-img-drop" onclick="document.getElementById('e-img-input').click()" ondragover="event.preventDefault()" ondrop="dropFoto(event,'e')">
+            <span class="img-drop-ico">🖼️</span>Clique ou arraste a arte aqui · JPG, PNG, WEBP
           </div>
-          <input type="file" id="e-img-input" accept="image/*" multiple style="display:none" onchange="addFotos(event)">
-          <div id="e-fotos-lista" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
-        </div>
+          <input type="file" id="e-img-input" accept="image/*" style="display:none" onchange="loadFoto(event,'e')">
+          <img id="e-img-prev" class="img-prev" alt="Arte">
+          <button class="img-rm-btn" id="e-img-rm" onclick="remFoto('e')">✕ Remover foto</button>
         </div>
         <div class="checks" style="margin-top:8px">
           <label><input type="checkbox" id="e-urg"> ⚡ Urgente</label>
@@ -411,7 +411,6 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f1117;color:#f3f4f
       <button class="tab" onclick="mudarTab('adm','caixa',this)">💰 Caixa</button>
       <button class="tab" onclick="mudarTab('adm','prazo',this)">⏳ A prazo<span id="prazo-badge" style="background:#7c3aed;color:#fff;border-radius:20px;padding:1px 7px;font-size:9px;margin-left:4px">0</span></button>
       <button class="tab" onclick="mudarTab('adm','despesas',this)">🧾 Despesas equipe</button>
-      <button class="tab" onclick="mudarTab('adm','historico',this)">📅 Histórico</button>
     </div>
     <div class="tab-panel ativo" id="adm-tab-producao">
       <div id="alertas-adm" class="alertas"></div>
@@ -470,13 +469,6 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f1117;color:#f3f4f
       </div>
     </div>
   </div>
-      <div class="tab-panel" id="adm-tab-historico">
-      <div style="background:#1f2937;border:1px solid rgba(255,255,255,0.08);border-radius:12px;overflow:hidden">
-        <div style="padding:11px 14px;font-size:13px;font-weight:600;border-bottom:1px solid rgba(255,255,255,0.08)">📅 Histórico de entregas — últimos 30 dias</div>
-        <div id="historico-lista" style="padding:12px 14px"></div>
-      </div>
-    </div>
-
 </div>
 
 <div id="toast" class="toast"></div>
@@ -500,10 +492,9 @@ const SADM = {full:'2511', print:'2511'};
 const SEQ  = {full:'2040', print:'3857'};
 let lojaAtual = 'full';
 let modoAtual = '';
-let pedidos = [], lancamentos = [], despesas = [];
+let pedidos = [], lancamentos = [], despesas = [], pedidosExternos = [];
 let per = 'dia';
 let fotoData = {e: null, d: null};
-let fotosArray = []; // múltiplas fotos do pedido
 let unsubs = [];
 
 const hj = () => new Date().toISOString().split('T')[0];
@@ -544,7 +535,11 @@ window.entrarAdm = function() {
 
 window.entrarEquipe = function() {
   const s=document.getElementById('senha-eq').value;
-  if(s!==SEQ[lojaAtual]){document.getElementById('e-eq').style.display='block';document.getElementById('senha-eq').value='';return;}
+  if(s!==SEQ[lojaAtual]){
+    document.getElementById('e-eq').style.display='block';
+    document.getElementById('senha-eq').value='';
+    return;
+  }
   document.getElementById('e-eq').style.display='none';
   modoAtual='eq';irTela('loading');iniciarListeners();
   setTimeout(()=>{ irTela('equipe');configurarUI();renderEquipe(); },1000);
@@ -553,7 +548,7 @@ window.entrarEquipe = function() {
 window.sair = function() {
   modoAtual = ''; lojaAtual = 'full';
   unsubs.forEach(u=>u()); unsubs=[];
-  pedidos=[]; lancamentos=[]; despesas=[]; 
+  pedidos=[]; lancamentos=[]; despesas=[]; pedidosExternos=[];
   document.getElementById('senha-input').value='';
   document.getElementById('btn-full').className='loja-btn sel-full';
   document.getElementById('btn-print').className='loja-btn';
@@ -601,12 +596,13 @@ function configurarUI() {
           <div class="fg"><label>Observações (tamanho, cor, acabamento...)</label><textarea id="x-obs" placeholder="Ex: 90x60cm, lona fosca. Arte em anexo."></textarea></div>
         </div>
         <div class="foto-area">
-          <span class="foto-area-lbl">📸 Arte / Fotos do material (pode adicionar várias)</span>
-          <div class="img-drop" id="x-drop" onclick="document.getElementById('x-img-input').click()" ondragover="event.preventDefault()" ondrop="dropFotoMultiX(event)">
-            <span class="img-drop-ico">🖼️</span>Clique ou arraste as artes aqui
+          <span class="foto-area-lbl">📸 Arte / Foto do material</span>
+          <div class="img-drop" id="x-img-drop" onclick="document.getElementById('x-img-input').click()" ondragover="event.preventDefault()" ondrop="dropFoto(event,'x')">
+            <span class="img-drop-ico">🖼️</span>Clique ou arraste a arte aqui
           </div>
-          <input type="file" id="x-img-input" accept="image/*" multiple style="display:none" onchange="addFotosX(event)">
-          <div id="x-fotos-lista" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
+          <input type="file" id="x-img-input" accept="image/*" style="display:none" onchange="loadFoto(event,'x')">
+          <img id="x-img-prev" class="img-prev" alt="Arte">
+          <button class="img-rm-btn" id="x-img-rm" onclick="remFoto('x')">✕ Remover</button>
         </div>
         <button class="btn-reg roxo" style="margin-top:10px" onclick="enviarParaFull()">📤 Enviar para Full Gráfica</button>
       </div>
@@ -628,6 +624,18 @@ function configurarUI() {
     }
   }
 
+  if(lojaAtual === 'full' && modoAtual==='adm') {
+    const ta = document.createElement('button');
+    ta.className='tab tab-ext'; ta.textContent='📥 Da Print Up<span id="ext-badge" style="background:#06b6d4;color:#fff;border-radius:20px;padding:1px 7px;font-size:9px;margin-left:4px">0</span>';
+    ta.innerHTML = '📥 Da Print Up <span id="ext-badge" style="background:#06b6d4;color:#fff;border-radius:20px;padding:1px 7px;font-size:9px;margin-left:4px">0</span>';
+    ta.onclick=function(){ mudarTab('adm','daprint',this); };
+    admTabs.appendChild(ta);
+    const pa = document.createElement('div');
+    pa.className='tab-panel tab-panel-ext'; pa.id='adm-tab-daprint';
+    pa.innerHTML=`<div class="caixa-card"><div class="caixa-hd"><span>📥 Pedidos recebidos da Print Up</span></div><div id="full-ext-lista" class="ext-lista"></div></div>`;
+    document.getElementById('adm-tab-despesas').parentNode.appendChild(pa);
+  }
+}
 
 function iniciarListeners() {
   unsubs.forEach(u=>u()); unsubs=[];
@@ -653,65 +661,21 @@ function iniciarListeners() {
 window.mudarTab = function(modo, tab, el) {
   const _tid=modo==='eq'?'tela-equipe':'tela-adm';
   const _tla=document.getElementById(_tid);
-  if(_tla){_tla.querySelectorAll('.tab').forEach(t=>t.classList.remove('ativo'));_tla.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('ativo'));}
+  if(_tla){
+    _tla.querySelectorAll('.tab').forEach(t=>t.classList.remove('ativo'));
+    _tla.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('ativo'));
+  }
   el.classList.add('ativo');
   const panel = document.getElementById(`${modo}-tab-${tab}`);
   if(panel) panel.classList.add('ativo');
   if(modo==='adm' && tab==='caixa') renderCaixa();
   if(modo==='adm' && tab==='prazo') renderPrazo();
   if(modo==='adm' && tab==='despesas') renderDespAdm();
-  if(modo==='adm' && tab==='historico') renderHistorico();
+  if(modo==='adm' && tab==='daprint') renderExternos();
+  if(modo==='adm' && tab==='externo') renderExternos();
+  if(tab==='externo' && modo==='eq') renderExternos();
 };
 
-
-// MÚLTIPLAS FOTOS DO PEDIDO
-window.addFotos = function(e) {
-  const files = Array.from(e.target.files);
-  files.forEach(f => {
-    if(f.size > 8*1024*1024) { toast('Foto muito grande: '+f.name,'er'); return; }
-    const r = new FileReader();
-    r.onload = function(ev) {
-      fotosArray.push({data: ev.target.result, nome: f.name});
-      renderFotosLista();
-    };
-    r.readAsDataURL(f);
-  });
-  // limpar input para permitir adicionar o mesmo arquivo novamente
-  e.target.value = '';
-};
-window.dropFotoMulti = function(e) {
-  e.preventDefault();
-  const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-  files.forEach(f => {
-    const r = new FileReader();
-    r.onload = function(ev) {
-      fotosArray.push({data: ev.target.result, nome: f.name});
-      renderFotosLista();
-    };
-    r.readAsDataURL(f);
-  });
-};
-function renderFotosLista() {
-  const el = document.getElementById('e-fotos-lista');
-  if(!el) return;
-  el.innerHTML = fotosArray.map((ft,i) =>
-    '<div style="position:relative;display:inline-block">'
-    + '<img src="'+ft.data+'" style="width:70px;height:70px;object-fit:cover;border-radius:8px;border:1px solid rgba(255,255,255,0.12)">'
-    + '<button onclick="remFotoIdx('+i+')" style="position:absolute;top:-6px;right:-6px;background:#ef4444;border:none;border-radius:50%;width:18px;height:18px;cursor:pointer;color:#fff;font-size:11px;line-height:1;display:flex;align-items:center;justify-content:center">×</button>'
-    + '</div>'
-  ).join('');
-}
-window.remFotoIdx = function(i) {
-  fotosArray.splice(i, 1);
-  renderFotosLista();
-};
-function limparFotosPedido() {
-  fotosArray = [];
-  const el = document.getElementById('e-fotos-lista');
-  if(el) el.innerHTML = '';
-  const inp = document.getElementById('e-img-input');
-  if(inp) inp.value = '';
-}
 // FOTO
 window.loadFoto = function(e,key) {
   const f=e.target.files[0]; if(!f) return;
@@ -795,7 +759,7 @@ function cardHTML(p,comValor){
 function renderColunas(prefix,comValor){
   const cols={ag:[],pr:[],pt:[],en:[]};
   const mapa={aguardando:'ag',producao:'pr',pronto:'pt',entregue:'en'};
-  pedidos.filter(p=>!p.arquivado).forEach(p=>{const k=mapa[p.status];if(k)cols[k].push(p);});
+  pedidos.forEach(p=>{const k=mapa[p.status];if(k)cols[k].push(p);});
   ['ag','pr','pt','en'].forEach(k=>{
     document.getElementById(`${prefix}-n-${k}`).textContent=cols[k].length;
     const el=document.getElementById(`${prefix}-col-${k}`);
@@ -813,7 +777,7 @@ function renderAlertas(id){
   const prontos=pedidos.filter(p=>p.status==='pronto');
   const sinalPronto=pedidos.filter(p=>p.pgtoTipo==='sinal'&&p.status==='pronto');
   const prazoVenc=pedidos.filter(p=>p.pgtoTipo==='prazo'&&p.prazoVenc&&p.prazoVenc!=='indeterminado'&&new Date(p.prazoVenc+'T00:00:00')<=hoje&&p.status!=='entregue');
-  const extProntos=[];
+  const extProntos=pedidosExternos.filter(p=>p.status==='pronto'&&lojaAtual==='print');
   const al=[];
   if(atrasados.length) al.push(`<div class="alerta alerta-er">⚠️ <span><strong>${atrasados.length} atrasado${atrasados.length>1?'s':''}:</strong> ${atrasados.map(p=>p.cli).join(', ')}</span></div>`);
   if(venceHj.length) al.push(`<div class="alerta alerta-wn">🕐 <span><strong>Entrega hoje:</strong> ${venceHj.map(p=>p.cli).join(', ')}</span></div>`);
@@ -837,9 +801,9 @@ function renderAdm(){
     <div class="rd"><div class="rd-lbl">Em aberto</div><div class="rd-val az">${ativos}</div></div>
     <div class="rd"><div class="rd-lbl">Prontos/retirar</div><div class="rd-val vd">${prontos}</div></div>
     <div class="rd"><div class="rd-lbl">A receber</div><div class="rd-val am">${aprazo}</div></div>
-    <div class="rd"><div class="rd-lbl">Externos (Print)</div><div class="rd-val cy">0</div></div>`;
+    <div class="rd"><div class="rd-lbl">Externos (Print)</div><div class="rd-val cy">${pedidosExternos.filter(p=>p.status!=='entregue').length}</div></div>`;
   const pb=document.getElementById('prazo-badge'); if(pb) pb.textContent=aprazo;
-  const eb=document.getElementById('ext-badge'); if(eb) eb.textContent=0;
+  const eb=document.getElementById('ext-badge'); if(eb) eb.textContent=pedidosExternos.filter(p=>p.status==='aguardando').length;
 }
 
 window.abrirModal = function(modo,fid){
@@ -858,11 +822,10 @@ window.abrirModal = function(modo,fid){
     <div class="mlinha"><span class="mlbl">Origem</span><span>${p.orig||'—'}</span></div>
     <div class="mlinha"><span class="mlbl">Arte</span><span>${p.arte?'⚠️ Pendente':'✓ OK'}</span></div>
     ${p.obs?`<div style="margin-top:8px;font-size:11px;color:#9ca3af;background:#111827;padding:9px;border-radius:8px;line-height:1.5">${p.obs}</div>`:''}
-    ${p.imgs&&p.imgs.length>0?p.imgs.map(src=>`<img src="${src}" class="modal-img" style="margin-top:6px" alt="Arte">`).join(''):p.img?`<img src="${p.img}" class="modal-img" alt="Arte">`:''}`;
+    ${p.img?`<img src="${p.img}" class="modal-img" alt="Arte">`:''}`;
   const lbls={aguardando:'▶ Iniciar produção',producao:'✓ Marcar como pronto',pronto:'📦 Confirmar entrega',entregue:null};
   const acoes=[];
   if(lbls[p.status]) acoes.push(`<button class="m-btn verde" onclick="avancar('${fid}','${modo}')">${lbls[p.status]}</button>`);
-  if(p.status==='entregue') acoes.push(`<button class="m-btn" style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3)" onclick="arquivarPedido('${fid}','${modo}')">🗑 Remover do kanban</button>`);
   if(p.arte) acoes.push(`<button class="m-btn" onclick="marcarArte('${fid}','${modo}')">🎨 Arte recebida ✓</button>`);
   if(isAdm&&p.pgtoTipo==='prazo') acoes.push(`<button class="m-btn amber" onclick="receberPrazo('${fid}')">💰 Receber pagamento</button>`);
   if(isAdm&&p.pgtoTipo==='sinal'&&p.status==='pronto') acoes.push(`<button class="m-btn amber" onclick="receberSinalRest('${fid}')">💰 Receber restante (${fmt((p.val||0)-(p.sinalVal||0))})</button>`);
@@ -883,40 +846,6 @@ window.avancar=async function(fid,m){
     toast('Status atualizado!');
   }
   fecharModal(m);
-};
-
-window.arquivarPedido = async function(fid,m) {
-  const col=LOJAS[lojaAtual].col;
-  await updateDoc(doc(db,`${col}_pedidos`,fid),{arquivado:true,arquivadoEm:hj()});
-  fecharModal(m);
-  toast('Pedido arquivado. Disponível no histórico por 30 dias.');
-};
-
-window.renderHistorico = function() {
-  const el=document.getElementById('historico-lista');if(!el)return;
-  const d30=new Date();d30.setDate(d30.getDate()-30);
-  const d30s=d30.toISOString().split('T')[0];
-  const arq=pedidos.filter(p=>p.arquivado&&(p.arquivadoEm||'')>=d30s)
-    .sort((a,b)=>(b.arquivadoEm||'').localeCompare(a.arquivadoEm||''));
-  if(!arq.length){el.innerHTML='<div style="text-align:center;padding:20px;font-size:12px;color:#4b5563">Nenhum pedido arquivado nos últimos 30 dias</div>';return;}
-  const grs={};
-  arq.forEach(p=>{const dt=p.arquivadoEm||'?';if(!grs[dt])grs[dt]=[];grs[dt].push(p);});
-  el.innerHTML=Object.entries(grs).map(([dt,its])=>{
-    const [y,m,d]=dt.split('-');
-    const dtf=d+'/'+m+'/'+y;
-    const tot=its.reduce((a,p)=>a+(p.val||0),0);
-    const rows=its.map(p=>
-      '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:12px">'
-      +'<div><div style="font-weight:500">'+p.cli+'</div>'
-      +'<div style="font-size:10px;color:#6b7280">'+p.srv+'</div></div>'
-      +'<div style="text-align:right"><div style="color:#60a5fa;font-weight:600">'+fmt(p.val||0)+'</div>'
-      +'<div style="font-size:10px;color:#6b7280">'+(p.pgtoTipo||'')+'</div></div></div>'
-    ).join('');
-    return '<div style="margin-bottom:14px">'
-      +'<div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:#9ca3af;letter-spacing:.5px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.1);margin-bottom:6px">'
-      +'<span>📅 '+dtf+' &nbsp;·&nbsp; '+its.length+' pedido'+(its.length>1?'s':'')+'</span>'
-      +'<span style="color:#34d399">'+fmt(tot)+'</span></div>'+rows+'</div>';
-  }).join('');
 };
 
 window.marcarArte=async function(fid,m){
@@ -962,7 +891,7 @@ window.registrar=async function(){
   let prazoVenc='indeterminado';
   if(pgtoTipo==='prazo'&&prazoDias>0){const d=new Date();d.setDate(d.getDate()+prazoDias);prazoVenc=d.toISOString().split('T')[0];}
   const col=LOJAS[lojaAtual].col;
-  const pedido={cli,srv,val,prz:document.getElementById('e-prz').value,obs:document.getElementById('e-obs').value.trim(),orig:document.getElementById('e-orig').value,urg:document.getElementById('e-urg').checked,arte:document.getElementById('e-arte').checked,status:'aguardando',criado:serverTimestamp(),pgtoTipo,sinalVal,sinalPgto,prazoVenc,imgs:fotosArray.map(f=>f.data), img:fotosArray.length>0?fotosArray[0].data:null};
+  const pedido={cli,srv,val,prz:document.getElementById('e-prz').value,obs:document.getElementById('e-obs').value.trim(),orig:document.getElementById('e-orig').value,urg:document.getElementById('e-urg').checked,arte:document.getElementById('e-arte').checked,status:'aguardando',criado:serverTimestamp(),pgtoTipo,sinalVal,sinalPgto,prazoVenc,img:fotoData['e']||null};
   await addDoc(collection(db,`${col}_pedidos`),pedido);
   if(pgtoTipo==='sinal'&&sinalVal>0) await addDoc(collection(db,`${col}_lancamentos`),{tipo:'entrada',desc:`Sinal – ${cli}`,val:sinalVal,pgto:sinalPgto,cat:'Venda',data:hj(),criado:serverTimestamp()});
   else if(pgtoTipo==='pago'&&val>0) await addDoc(collection(db,`${col}_lancamentos`),{tipo:'entrada',desc:`Pagto – ${cli}`,val,pgto:document.getElementById('e-pgto').value,cat:'Venda',data:hj(),criado:serverTimestamp()});
@@ -976,12 +905,20 @@ window.registrar=async function(){
 };
 
 // ENVIAR PARA FULL
-
-
 // FULL: atualizar status do pedido externo
-
-
-
+window.salvarDesp=async function(){
+  const desc=document.getElementById('d-desc').value.trim();
+  const val=parseFloat(document.getElementById('d-val').value)||0;
+  if(!desc){toast('Informe a descrição.','er');return;}
+  if(!val){toast('Informe o valor.','er');return;}
+  const quem=document.getElementById('d-quem').value.trim()||'Equipe';
+  const col=LOJAS[lojaAtual].col;
+  await addDoc(collection(db,`${col}_despesas`),{desc,val,origem:document.getElementById('d-origem').value,cat:document.getElementById('d-cat').value,quem,data:hj(),img:fotoData['d']||null,criado:serverTimestamp()});
+  await addDoc(collection(db,`${col}_lancamentos`),{tipo:'saida',desc:`${desc} (${quem})`,val,pgto:'Caixa',cat:'Despesa equipe',data:hj(),criado:serverTimestamp()});
+  ['d-desc','d-val','d-quem'].forEach(id=>document.getElementById(id).value='');
+  remFoto('d');
+  toast('✓ Despesa registrada!');
+};
 
 function renderDespEq(){
   const el=document.getElementById('desp-lista-eq'); if(!el) return;
