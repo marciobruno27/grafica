@@ -282,6 +282,22 @@
     .toast.show { display: block; }
     .loading { opacity: .65; pointer-events: none; }
 
+    .alerts-bar { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px,1fr)); gap: 8px; margin-bottom: 12px; }
+    .alert-chip { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: var(--radius); font-size: 13px; font-weight: 700; border: 1px solid; }
+    .alert-chip.red { background: #fee4e2; color: #991b1b; border-color: #fca5a5; }
+    .alert-chip.orange { background: #fff1e5; color: #9a3412; border-color: #fdba74; }
+    .alert-chip.blue { background: #eff6ff; color: #1e40af; border-color: #93c5fd; }
+    .alert-chip.green { background: #dcfce7; color: #166534; border-color: #86efac; }
+    .card.late { border-left: 4px solid #b42318; }
+    .card.urgent { border-left: 4px solid #dc2626; }
+    .card.arte { border-left: 4px solid #b54708; }
+    .finance-filter { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+    .finance-filter button { min-height: 36px; padding: 6px 16px; font-size: 13px; }
+    .finance-filter button.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+    .check-row { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; padding: 10px 0 4px; }
+    .check-item { display: flex; align-items: center; gap: 7px; cursor: pointer; font-weight: 700; font-size: 14px; user-select: none; }
+    .check-item input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--danger); }
+
     @media (max-width: 980px) {
       .kanban { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -358,6 +374,7 @@
             <input id="searchOrders" class="search-input" placeholder="Buscar cliente, descrição ou colaborador" oninput="renderKanban()">
           </div>
         </div>
+        <div id="alertsBar"></div>
         <div id="kanban" class="kanban"></div>
       </section>
 
@@ -389,6 +406,7 @@
             <div class="muted small">Visível apenas para administrador.</div>
           </div>
         </div>
+        <div id="financeFilterBar"></div>
         <div id="financeSummary" class="summary-grid"></div>
         <div class="grid grid-2">
           <div class="panel">
@@ -429,6 +447,16 @@
           <label for="orderDescription">Descrição do pedido</label>
           <textarea id="orderDescription" required placeholder="Produto, medidas, quantidade, acabamento, prazo..."></textarea>
         </div>
+        <div class="grid grid-2">
+          <div class="field">
+            <label for="orderService">Serviço</label>
+            <select id="orderService"><option value="">Selecione...</option></select>
+          </div>
+          <div class="field">
+            <label for="orderOrigin">Origem</label>
+            <select id="orderOrigin"><option value="">Selecione...</option></select>
+          </div>
+        </div>
         <div class="grid grid-3">
           <div class="field">
             <label for="orderDueDate">Prazo</label>
@@ -447,6 +475,10 @@
               <option value="entregue">Entregue</option>
             </select>
           </div>
+        </div>
+        <div class="check-row">
+          <label class="check-item"><input type="checkbox" id="orderUrgent"> 🚨 Urgente</label>
+          <label class="check-item"><input type="checkbox" id="orderArtePendente"> 🎨 Arte pendente</label>
         </div>
         <div class="grid grid-3">
           <div class="field">
@@ -518,11 +550,17 @@
           <label for="expenseDescription">Descrição</label>
           <input id="expenseDescription" required placeholder="Uber, café, motoboy, material...">
         </div>
-        <div class="grid grid-3">
+        <div class="grid grid-2">
           <div class="field">
             <label for="expenseValue">Valor</label>
             <input id="expenseValue" type="number" min="0" step="0.01" inputmode="decimal" required>
           </div>
+          <div class="field">
+            <label for="expenseCategory">Categoria</label>
+            <select id="expenseCategory" required><option value="">Selecione...</option></select>
+          </div>
+        </div>
+        <div class="grid grid-2">
           <div class="field">
             <label for="expenseOrigin">Origem do dinheiro</label>
             <select id="expenseOrigin" required>
@@ -579,6 +617,9 @@
       print: { name: "Print Up", teamPassword: "3857" }
     };
     var ADMIN_PASSWORD = "2511";
+    var SERVICE_OPTIONS = ["Banner","Adesivo","Impressão","Foto","Camiseta","Caneca","Cartão","Folder","Fachada","Placa","Lona","Acrílico","Outro"];
+    var ORIGIN_OPTIONS = ["Balcão","WhatsApp","Telefone","Instagram","Revenda","Outro"];
+    var EXPENSE_CATEGORIES = ["Transporte","Alimentação","Material","Motoboy","Frete","Limpeza","Manutenção","Outro"];
     var STATUS = [
       { id: "novo", label: "Novo" },
       { id: "producao", label: "Produção" },
@@ -595,7 +636,8 @@
       finance: [],
       unsubscribers: [],
       orderImages: [],
-      expenseReceipt: ""
+      expenseReceipt: "",
+      financeFilter: "mes"
     };
 
     document.addEventListener("DOMContentLoaded", init);
@@ -677,9 +719,20 @@
       document.getElementById("rolePill").textContent = appState.user.role === "admin" ? "Administrador" : "Equipe";
       document.getElementById("orderResponsible").value = appState.user.name;
       document.getElementById("expenseCollaborator").value = appState.user.name;
+      populateSelect("orderService", SERVICE_OPTIONS);
+      populateSelect("orderOrigin", ORIGIN_OPTIONS);
+      populateSelect("expenseCategory", EXPENSE_CATEGORIES);
       renderTabs();
       switchTab("kanban");
       attachListeners();
+    }
+
+    function populateSelect(id, options) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.innerHTML = '<option value="">Selecione...</option>' + options.map(function(o) {
+        return '<option value="' + o + '">' + o + '</option>';
+      }).join("");
     }
 
     function renderTabs() {
@@ -765,7 +818,28 @@
       renderFinance();
     }
 
+    function renderAlerts() {
+      var el = document.getElementById("alertsBar");
+      if (!el) return;
+      var today = new Date(); today.setHours(0,0,0,0);
+      var todayStr = today.toISOString().slice(0,10);
+      var active = appState.orders.filter(function(o) { return o.status !== "entregue" && !o.archivedAt; });
+      var late = active.filter(function(o) { return o.dueDate && new Date(o.dueDate + "T00:00:00") < today; });
+      var dueToday = active.filter(function(o) { return o.dueDate === todayStr; });
+      var arte = active.filter(function(o) { return o.artePendente; });
+      var urgent = active.filter(function(o) { return o.urgent; });
+      var sinais = active.filter(function(o) { return o.status === "pronto" && o.paymentStatus === "pendente"; });
+      var chips = [];
+      if (late.length) chips.push('<div class="alert-chip red">⚠ ' + late.length + ' atrasado' + (late.length > 1 ? 's' : '') + '</div>');
+      if (urgent.length) chips.push('<div class="alert-chip red">🚨 ' + urgent.length + ' urgente' + (urgent.length > 1 ? 's' : '') + '</div>');
+      if (dueToday.length) chips.push('<div class="alert-chip orange">📅 ' + dueToday.length + ' entrega hoje</div>');
+      if (arte.length) chips.push('<div class="alert-chip blue">🎨 ' + arte.length + ' arte pendente</div>');
+      if (sinais.length) chips.push('<div class="alert-chip green">💰 ' + sinais.length + ' sinal a cobrar</div>');
+      el.innerHTML = chips.length ? '<div class="alerts-bar">' + chips.join("") + '</div>' : '';
+    }
+
     function renderKanban() {
+      renderAlerts();
       var kanban = document.getElementById("kanban");
       if (!kanban) return;
       var term = (valueOf("searchOrders") || "").toLowerCase();
@@ -785,12 +859,21 @@
 
     function renderOrderCard(order) {
       var payment = paymentBadge(order);
-      var due = order.dueDate ? '<span class="badge">Prazo ' + formatDate(order.dueDate) + '</span>' : "";
-      var img = Array.isArray(order.images) && order.images.length ? '<span class="badge">' + order.images.length + ' img</span>' : "";
-      return '<article class="card">' +
+      var today = new Date(); today.setHours(0,0,0,0);
+      var isLate = order.dueDate && new Date(order.dueDate + "T00:00:00") < today;
+      var due = order.dueDate
+        ? '<span class="badge' + (isLate ? " danger" : "") + '">📅 ' + formatDate(order.dueDate) + (isLate ? " ⚠" : "") + '</span>'
+        : "";
+      var img = Array.isArray(order.images) && order.images.length ? '<span class="badge">' + order.images.length + ' 📷</span>' : "";
+      var svcBadge = order.service ? '<span class="badge">' + escapeHtml(order.service) + '</span>' : "";
+      var urgBadge = order.urgent ? '<span class="badge danger">🚨 Urgente</span>' : "";
+      var arteBadge = order.artePendente ? '<span class="badge warn">🎨 Arte</span>' : "";
+      var sinBadge = (!isAdmin() && order.status === "pronto" && order.paymentStatus === "pendente") ? '<span class="badge warn">💰 Cobrar sinal</span>' : "";
+      var cardClass = "card" + (isLate ? " late" : "") + (order.urgent ? " urgent" : "") + (order.artePendente && !order.urgent && !isLate ? " arte" : "");
+      return '<article class="' + cardClass + '">' +
         '<div class="card-title">' + escapeHtml(order.client || "Sem cliente") + '</div>' +
-        '<div class="small">' + escapeHtml(shortText(order.description || "", 100)) + '</div>' +
-        '<div class="card-meta">' + due + img + payment + '<span class="badge">' + escapeHtml(order.responsible || "Sem resp.") + '</span></div>' +
+        '<div class="small">' + escapeHtml(shortText(order.description || "", 90)) + '</div>' +
+        '<div class="card-meta">' + due + svcBadge + img + urgBadge + arteBadge + sinBadge + payment + '<span class="badge">' + escapeHtml(order.responsible || "Sem resp.") + '</span></div>' +
         '<div class="card-actions">' +
           '<button onclick="openDetails(\'' + order.id + '\')">Abrir</button>' +
           nextStatusButton(order) +
@@ -862,24 +945,30 @@
       var summary = document.getElementById("financeSummary");
       var entries = document.getElementById("financeEntries");
       var pending = document.getElementById("pendingPayments");
+      var filterBar = document.getElementById("financeFilterBar");
       if (!summary || !entries || !pending) return;
       var now = new Date();
       var startDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       var startWeek = new Date(startDay); startWeek.setDate(startWeek.getDate() - startWeek.getDay());
       var startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      var day = totalEntriesSince(startDay, "entrada");
-      var week = totalEntriesSince(startWeek, "entrada");
-      var month = totalEntriesSince(startMonth, "entrada");
-      var entradas = totalEntries(null, "entrada");
-      var saidas = totalEntries(null, "saida");
+      var filterStart = appState.financeFilter === "dia" ? startDay : appState.financeFilter === "semana" ? startWeek : appState.financeFilter === "mes" ? startMonth : null;
+      var filterLabels = { dia: "Hoje", semana: "Semana", mes: "Mês", tudo: "Tudo" };
+      if (filterBar) {
+        filterBar.innerHTML = '<div class="finance-filter">' +
+          ["dia","semana","mes","tudo"].map(function(f) {
+            return '<button class="' + (appState.financeFilter === f ? "active" : "") + '" onclick="setFinanceFilter(\'' + f + '\')">' + filterLabels[f] + '</button>';
+          }).join("") + '</div>';
+      }
+      var entradas = totalEntriesSince(filterStart, "entrada");
+      var saidas = totalEntriesSince(filterStart, "saida");
       var aberto = appState.orders.reduce(function(sum, order) { return sum + (order.paymentStatus === "pendente" ? number(order.remainingValue) : 0); }, 0);
       summary.innerHTML = [
-        ["Faturamento dia", money(day)],
-        ["Faturamento semana", money(week)],
-        ["Faturamento mês", money(month)],
-        ["Saldo", money(entradas - saidas)],
-        ["Entradas", money(entradas)],
-        ["Saídas", money(saidas)],
+        ["Faturamento hoje", money(totalEntriesSince(startDay, "entrada"))],
+        ["Faturamento semana", money(totalEntriesSince(startWeek, "entrada"))],
+        ["Faturamento mês", money(totalEntriesSince(startMonth, "entrada"))],
+        ["Entradas (" + filterLabels[appState.financeFilter] + ")", money(entradas)],
+        ["Saídas (" + filterLabels[appState.financeFilter] + ")", money(saidas)],
+        ["Saldo (" + filterLabels[appState.financeFilter] + ")", money(entradas - saidas)],
         ["Valores em aberto", money(aberto)],
         ["Pendências", String(appState.orders.filter(function(o) { return o.paymentStatus === "pendente"; }).length)]
       ].map(function(item) {
@@ -894,10 +983,21 @@
           '<div class="card-actions"><button onclick="openDetails(\'' + order.id + '\')">Abrir</button><button class="btn-ok" onclick="receiveRemaining(\'' + order.id + '\')">Receber restante</button></div>' +
         '</div>';
       }).join("") : '<div class="empty">Sem pendências</div>';
-      entries.innerHTML = appState.finance.length ? '<table><thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Valor</th><th>Forma</th></tr></thead><tbody>' +
-        appState.finance.slice(0, 80).map(function(entry) {
-          return '<tr><td>' + formatTimestamp(entry.createdAt) + '</td><td>' + escapeHtml(entry.type) + '</td><td>' + escapeHtml(entry.description) + '</td><td class="money">' + money(entry.value) + '</td><td>' + escapeHtml(entry.method || entry.origin || "-") + '</td></tr>';
-        }).join("") + '</tbody></table>' : '<div class="empty">Sem movimentações</div>';
+      var filteredFinance = appState.finance.filter(function(e) {
+        if (!filterStart) return true;
+        var d = toDate(e.createdAt);
+        return d && d >= filterStart;
+      });
+      entries.innerHTML = filteredFinance.length ? '<table><thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Valor</th><th>Forma</th></tr></thead><tbody>' +
+        filteredFinance.slice(0, 100).map(function(entry) {
+          var typeLabel = entry.type === "entrada" ? '<span style="color:var(--ok);font-weight:800">↑ Entrada</span>' : '<span style="color:var(--danger);font-weight:800">↓ Saída</span>';
+          return '<tr><td>' + formatTimestamp(entry.createdAt) + '</td><td>' + typeLabel + '</td><td>' + escapeHtml(entry.description) + '</td><td class="money">' + money(entry.value) + '</td><td>' + escapeHtml(entry.method || entry.origin || "-") + '</td></tr>';
+        }).join("") + '</tbody></table>' : '<div class="empty">Sem movimentações no período.</div>';
+    }
+
+    function setFinanceFilter(filter) {
+      appState.financeFilter = filter;
+      renderFinance();
     }
 
     function openOrderModal(orderId) {
@@ -919,6 +1019,10 @@
         setValue("signalValue", number(order.signalValue) || "");
         setValue("remainingDueDate", order.paymentDueDate || "");
         setValue("paymentTerm", order.paymentTerm || "3");
+        setValue("orderService", order.service || "");
+        setValue("orderOrigin", order.origin || "");
+        setChecked("orderUrgent", !!order.urgent);
+        setChecked("orderArtePendente", !!order.artePendente);
         appState.orderImages = Array.isArray(order.images) ? order.images.slice() : [];
       }
       togglePaymentFields();
@@ -935,7 +1039,11 @@
       setValue("paymentMethod", "pix");
       setValue("paymentTerm", "3");
       setValue("orderTotal", "");
+      setValue("orderService", "");
+      setValue("orderOrigin", "");
       setValue("orderResponsible", appState.user ? appState.user.name : "");
+      setChecked("orderUrgent", false);
+      setChecked("orderArtePendente", false);
       appState.orderImages = [];
       renderOrderImages();
     }
@@ -988,6 +1096,10 @@
         dueDate: valueOf("orderDueDate"),
         responsible: valueOf("orderResponsible").trim() || appState.user.name,
         status: valueOf("orderStatus") || "novo",
+        service: valueOf("orderService"),
+        origin: valueOf("orderOrigin"),
+        urgent: getChecked("orderUrgent"),
+        artePendente: getChecked("orderArtePendente"),
         images: appState.orderImages.slice(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
         updatedBy: appState.user.name,
@@ -1073,6 +1185,7 @@
     function openExpenseModal() {
       setValue("expenseDescription", "");
       setValue("expenseValue", "");
+      setValue("expenseCategory", "");
       setValue("expenseOrigin", "caixa");
       setValue("expenseCollaborator", appState.user ? appState.user.name : "");
       setValue("expenseReceipt", "");
@@ -1108,6 +1221,7 @@
       var payload = {
         description: valueOf("expenseDescription").trim(),
         value: number(valueOf("expenseValue")),
+        category: valueOf("expenseCategory"),
         origin: valueOf("expenseOrigin"),
         collaborator: valueOf("expenseCollaborator").trim() || appState.user.name,
         receipt: appState.expenseReceipt,
@@ -1148,9 +1262,15 @@
       var images = Array.isArray(order.images) && order.images.length ? '<div class="gallery">' + order.images.map(function(src, i) {
         return '<a href="' + src + '" target="_blank"><img src="' + src + '" alt="Imagem ' + (i + 1) + '"></a>';
       }).join("") + '</div>' : '<div class="empty">Sem imagens</div>';
+      var flags = [];
+      if (order.urgent) flags.push('<span class="badge danger">🚨 Urgente</span>');
+      if (order.artePendente) flags.push('<span class="badge warn">🎨 Arte pendente</span>');
+      var flagsHtml = flags.length ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">' + flags.join("") + '</div>' : "";
       document.getElementById("detailsBody").innerHTML =
         '<div class="grid">' +
+        flagsHtml +
         '<div><strong>Descrição</strong><br>' + escapeHtml(order.description || "") + '</div>' +
+        '<div class="grid grid-2"><div><strong>Serviço</strong><br>' + escapeHtml(order.service || "-") + '</div><div><strong>Origem</strong><br>' + escapeHtml(order.origin || "-") + '</div></div>' +
         '<div class="grid grid-2"><div><strong>Status</strong><br>' + escapeHtml(labelStatus(order.status)) + '</div><div><strong>Responsável</strong><br>' + escapeHtml(order.responsible || "-") + '</div></div>' +
         '<div class="grid grid-2"><div><strong>Prazo</strong><br>' + formatDate(order.dueDate || "") + '</div><div><strong>Tipo</strong><br>' + escapeHtml(order.type || "-") + '</div></div>' +
         financeHtml +
@@ -1356,6 +1476,16 @@
       if (el) el.value = value == null ? "" : value;
     }
 
+    function setChecked(id, checked) {
+      var el = document.getElementById(id);
+      if (el) el.checked = !!checked;
+    }
+
+    function getChecked(id) {
+      var el = document.getElementById(id);
+      return el ? el.checked : false;
+    }
+
     function setBusy(id, busy) {
       var el = document.getElementById(id);
       if (el) {
@@ -1451,6 +1581,8 @@
     window.receiveRemaining = receiveRemaining;
     window.deleteOrder = deleteOrder;
     window.renderKanban = renderKanban;
+    window.setFinanceFilter = setFinanceFilter;
+    window.populateSelect = populateSelect;
   </script>
 </body>
 </html>
